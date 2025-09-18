@@ -14,19 +14,31 @@ export default function SupplierTable({ refresh }) {
   }
 
   return (
-    <table border="1" cellPadding="5">
-      <thead>
-        <tr>
-          <th>Name</th><th>Email</th><th>Phone</th>
-        </tr>
-      </thead>
-      <tbody>
-        {suppliers.map((s, i) => (
-          <tr key={i}>
-            <td>{s.name}</td><td>{s.email}</td><td>{s.phone}</td>
+    <div className="overflow-x-auto max-w-3xl mx-auto">
+      <h2 className="text-2xl font-semibold text-gray-700 mb-4">
+        Supplier List
+      </h2>
+      <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
+        <thead className="bg-blue-600 text-white">
+          <tr>
+            <th className="py-2 px-4 text-left">Name</th>
+            <th className="py-2 px-4 text-left">Email</th>
+            <th className="py-2 px-4 text-left">Phone</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {suppliers.map((s, i) => (
+            <tr
+              key={i}
+              className="border-b hover:bg-gray-100 transition-colors"
+            >
+              <td className="py-2 px-4">{s.name}</td>
+              <td className="py-2 px-4">{s.email}</td>
+              <td className="py-2 px-4">{s.phone}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
