@@ -1,9 +1,19 @@
+import { useState } from "react";
+import SupplierForm from "./components/SupplierForm";
+import SupplierTable from "./components/SupplierTable";
+
 export default function App() {
+  const [refresh, setRefresh] = useState(false);
+
+  function reload() {
+    setRefresh(!refresh);
+  }
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-black">
-      <h1 className="text-6xl font-bold text-green-400 bg-blue-600 p-8 rounded-lg">
-        🚀 Tailwind is finally working!
-      </h1>
+    <div>
+      <h1>Supplier Module</h1>
+      <SupplierForm onAdded={reload} />
+      <SupplierTable refresh={refresh} />
     </div>
-  )
+  );
 }
