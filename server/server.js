@@ -13,6 +13,10 @@ app.use("/api/suppliers", supplierRoutes);
 const productRoutes = require("./routes/productRoutes");
 app.use("/api/products", productRoutes);
 
+const purchaseRoutes = require("./routes/purchaseRoutes");
+app.use("/api/purchases", purchaseRoutes);
+
+
 
 
 
