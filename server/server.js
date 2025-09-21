@@ -16,6 +16,14 @@ app.use("/api/products", productRoutes);
 const purchaseRoutes = require("./routes/purchaseRoutes");
 app.use("/api/purchases", purchaseRoutes);
 
+const customerRoutes = require("./routes/customerRoutes");
+const invoiceRoutes = require("./routes/invoiceRoutes");
+
+app.use("/api/customers", customerRoutes);
+app.use("/api/invoices", invoiceRoutes);
+
+
+
 
 
 

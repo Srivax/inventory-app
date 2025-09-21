@@ -1,50 +1,98 @@
 import { useState } from "react";
+
+// Modules
 import SupplierForm from "./components/SupplierForm";
 import SupplierTable from "./components/SupplierTable";
 import ProductForm from "./components/ProductForm";
 import ProductTable from "./components/ProductTable";
-import PurchaseForm from "./components/PurchaseForm";
-import PurchaseTable from "./components/PurchaseTable";
+import CustomerForm from "./components/CustomerForm";
+import CustomerTable from "./components/CustomerTable";
+import InvoiceForm from "./components/InvoiceForm";
+import InvoiceTable from "./components/InvoiceTable";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("suppliers");
 
+  // Suppliers
   const [supplierRefresh, setSupplierRefresh] = useState(false);
-  const [productRefresh, setProductRefresh] = useState(false);
-  const [purchaseRefresh, setPurchaseRefresh] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState(null);
 
-  function reloadSuppliers() { setSupplierRefresh(!supplierRefresh); }
-  function reloadProducts() { setProductRefresh(!productRefresh); }
-  function reloadPurchases() { setPurchaseRefresh(!purchaseRefresh); }
+  // Products
+  const [productRefresh, setProductRefresh] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+
+  // Customers
+  const [customerRefresh, setCustomerRefresh] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null);
+
+  // Invoices
+  const [invoiceRefresh, setInvoiceRefresh] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState(null);
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <nav className="bg-blue-700 text-white px-6 py-3 flex justify-between items-center">
-        <h1 className="text-xl font-bold">Inventory App</h1>
-        <div className="space-x-4">
-          <button onClick={() => setActiveTab("suppliers")} className={`hover:underline ${activeTab === "suppliers" && "font-bold underline"}`}>Suppliers</button>
-          <button onClick={() => setActiveTab("products")} className={`hover:underline ${activeTab === "products" && "font-bold underline"}`}>Products</button>
-          <button onClick={() => setActiveTab("purchases")} className={`hover:underline ${activeTab === "purchases" && "font-bold underline"}`}>Purchases</button>
-        </div>
+      <nav className="bg-blue-700 text-white px-6 py-3 flex flex-wrap gap-3 items-center">
+        <h1 className="text-xl font-bold mr-auto">Inventory App</h1>
+        <button onClick={() => setActiveTab("suppliers")} className={`px-3 py-1 rounded ${activeTab==="suppliers" ? "bg-white text-blue-700" : "bg-blue-600 hover:bg-blue-500"}`}>Suppliers</button>
+        <button onClick={() => setActiveTab("products")} className={`px-3 py-1 rounded ${activeTab==="products" ? "bg-white text-blue-700" : "bg-blue-600 hover:bg-blue-500"}`}>Products</button>
+        <button onClick={() => setActiveTab("customers")} className={`px-3 py-1 rounded ${activeTab==="customers" ? "bg-white text-blue-700" : "bg-blue-600 hover:bg-blue-500"}`}>Customers</button>
+        <button onClick={() => setActiveTab("invoices")} className={`px-3 py-1 rounded ${activeTab==="invoices" ? "bg-white text-blue-700" : "bg-blue-600 hover:bg-blue-500"}`}>Invoices</button>
       </nav>
 
       <div className="p-6">
         {activeTab === "suppliers" && (
           <>
-            <SupplierForm onSaved={reloadSuppliers} />
-            <SupplierTable refresh={supplierRefresh} />
+            <SupplierForm
+              onSaved={() => setSupplierRefresh(!supplierRefresh)}
+              editingSupplier={editingSupplier}
+              clearEdit={() => setEditingSupplier(null)}
+            />
+            <SupplierTable
+              refresh={supplierRefresh}
+              onEdit={(s) => setEditingSupplier(s)}
+            />
           </>
         )}
+
         {activeTab === "products" && (
           <>
-            <ProductForm onSaved={reloadProducts} />
-            <ProductTable refresh={productRefresh} />
+            <ProductForm
+              onSaved={() => setProductRefresh(!productRefresh)}
+              editingProduct={editingProduct}
+              clearEdit={() => setEditingProduct(null)}
+            />
+            <ProductTable
+              refresh={productRefresh}
+              onEdit={(p) => setEditingProduct(p)}
+            />
           </>
         )}
-        {activeTab === "purchases" && (
+
+        {activeTab === "customers" && (
           <>
-            <PurchaseForm onSaved={reloadPurchases} />
-            <PurchaseTable refresh={purchaseRefresh} onConfirmed={reloadPurchases} />
+            <CustomerForm
+              onSaved={() => setCustomerRefresh(!customerRefresh)}
+              editingCustomer={editingCustomer}
+              clearEdit={() => setEditingCustomer(null)}
+            />
+            <CustomerTable
+              refresh={customerRefresh}
+              onEdit={(c) => setEditingCustomer(c)}
+            />
+          </>
+        )}
+
+        {activeTab === "invoices" && (
+          <>
+            <InvoiceForm
+              onSaved={() => setInvoiceRefresh(!invoiceRefresh)}
+              editingInvoice={editingInvoice}
+              clearEdit={() => setEditingInvoice(null)}
+            />
+            <InvoiceTable
+              refresh={invoiceRefresh}
+              onEdit={(inv) => setEditingInvoice(inv)}
+            />
           </>
         )}
       </div>
