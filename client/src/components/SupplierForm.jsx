@@ -1,50 +1,58 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 
-export default function SupplierForm({ onSaved, editingSupplier, clearEdit }) {
+export default function SupplierForm({ refresh, setRefresh }) {
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
+  const [recordId, setRecordId] = useState(null);
 
   useEffect(() => {
-    if (editingSupplier) setForm(editingSupplier);
-  }, [editingSupplier]);
+    const handler = (e) => {
+      if (e.detail?.type !== "supplier") return;
+      const s = e.detail.data;
+      setRecordId(s._id);
+      setForm({ name: s.name || "", email: s.email || "", phone: s.phone || "" });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener("edit-entity", handler);
+    return () => window.removeEventListener("edit-entity", handler);
+  }, []);
 
-  function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  }
+  const onChange = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+  const reset = () => { setRecordId(null); setForm({ name: "", email: "", phone: "" }); };
 
-  async function handleSubmit(e) {
+  const submit = async (e) => {
     e.preventDefault();
-    if (editingSupplier?._id) {
-      await axios.put(`http://localhost:5000/api/suppliers/${editingSupplier._id}`, form);
+    if (!form.name.trim() || !form.phone.trim()) return alert("Name and Phone are required.");
+    if (recordId) {
+      await axios.put(`http://localhost:5000/api/suppliers/${recordId}`, form);
     } else {
       await axios.post("http://localhost:5000/api/suppliers", form);
     }
-    onSaved();
-    setForm({ name: "", email: "", phone: "" });
-    clearEdit();
-  }
+    reset();
+    setRefresh(!refresh);
+  };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-lg p-6 max-w-md mx-auto mb-6">
-      <h2 className="text-2xl font-semibold text-gray-700 mb-4">
-        {editingSupplier ? "Edit Supplier" : "Add Supplier"}
-      </h2>
-
-      <input name="name" value={form.name} onChange={handleChange} placeholder="Supplier Name" required className="w-full p-2 mb-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"/>
-      <input type="email" name="email" value={form.email} onChange={handleChange} placeholder="Email" required className="w-full p-2 mb-3 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"/>
-      <input name="phone" value={form.phone} onChange={handleChange} placeholder="Phone" required className="w-full p-2 mb-4 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"/>
-
-      <div className="flex gap-3">
-        {!editingSupplier && (
-          <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Save</button>
-        )}
-        {editingSupplier && (
-          <>
-            <button type="submit" className="flex-1 bg-yellow-600 text-white py-2 rounded hover:bg-yellow-700">Update</button>
-            <button type="button" onClick={clearEdit} className="px-4 py-2 rounded border border-gray-300 hover:bg-gray-100">Cancel</button>
-          </>
-        )}
-      </div>
-    </form>
+    <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-xl shadow-lg mb-6 border border-blue-200">
+      <h2 className="text-lg font-bold text-blue-700 mb-4">{recordId ? "✏️ Edit Supplier" : "➕ Add New Supplier"}</h2>
+      <form onSubmit={submit} className="grid gap-4">
+        <div>
+          <label className="text-sm font-medium">Name <span className="text-red-500">*</span></label>
+          <input className="border p-2 w-full rounded focus:ring-2 focus:ring-blue-400" value={form.name} onChange={(e) => onChange("name", e.target.value)} />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Email</label>
+          <input className="border p-2 w-full rounded focus:ring-2 focus:ring-blue-400" value={form.email} onChange={(e) => onChange("email", e.target.value)} />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Phone <span className="text-red-500">*</span></label>
+          <input className="border p-2 w-full rounded focus:ring-2 focus:ring-blue-400" value={form.phone} onChange={(e) => onChange("phone", e.target.value)} />
+        </div>
+        <div className="flex justify-end space-x-2">
+          {recordId && <button type="button" onClick={reset} className="bg-gray-200 px-4 py-2 rounded">Cancel</button>}
+          <button className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-lg">{recordId ? "Update Supplier" : "Save Supplier"}</button>
+        </div>
+      </form>
+    </div>
   );
 }

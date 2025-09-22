@@ -1,42 +1,33 @@
 const express = require("express");
-const router = express.Router();
 const Supplier = require("../models/supplier");
+const router = express.Router();
 
-// Create
-router.post("/", async (req, res) => {
+// create
+router.post("/", async (req, res, next) => {
   try {
-    const supplier = new Supplier(req.body);
-    const saved = await supplier.save();
-    res.json(saved);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+    const sup = await Supplier.create(req.body);
+    res.json(sup);
+  } catch (e) { next(e); }
 });
 
-// Read
-router.get("/", async (req, res) => {
-  const suppliers = await Supplier.find();
-  res.json(suppliers);
+// read
+router.get("/", async (_req, res, next) => {
+  try { res.json(await Supplier.find().sort({ createdAt: -1 })); }
+  catch (e) { next(e); }
 });
 
-// Update
-router.put("/:id", async (req, res) => {
+// update
+router.put("/:id", async (req, res, next) => {
   try {
-    const supplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    res.json(supplier);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+    const sup = await Supplier.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(sup);
+  } catch (e) { next(e); }
 });
 
-// Delete
-router.delete("/:id", async (req, res) => {
-  try {
-    await Supplier.findByIdAndDelete(req.params.id);
-    res.json({ message: "Supplier deleted" });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+// delete
+router.delete("/:id", async (req, res, next) => {
+  try { await Supplier.findByIdAndDelete(req.params.id); res.json({ message: "Supplier deleted" }); }
+  catch (e) { next(e); }
 });
 
 module.exports = router;

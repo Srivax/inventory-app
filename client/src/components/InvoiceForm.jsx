@@ -1,149 +1,166 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 
-export default function InvoiceForm({ onSaved, editingInvoice, clearEdit }) {
-  const [form, setForm] = useState({
-    customer: "",
-    items: [],
-    discount: "",
-    gst: "",
-    product: "",
-    qty: "",
-    rate: ""
-  });
-
+export default function InvoiceForm({ refresh, setRefresh }) {
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [recordId, setRecordId] = useState(null);
+
+  const [customer, setCustomer] = useState("");
+  const [items, setItems] = useState([{ product: "", qty: "", rate: "" }]);
+  const [discount, setDiscount] = useState(0);
+  const [gst, setGst] = useState(0);
 
   useEffect(() => {
-    axios.get("http://localhost:5000/api/customers").then(res => setCustomers(res.data));
-    axios.get("http://localhost:5000/api/products").then(res => setProducts(res.data));
+    axios.get("http://localhost:5000/api/customers").then((r) => setCustomers(r.data || []));
+    axios.get("http://localhost:5000/api/products").then((r) => setProducts(r.data || []));
   }, []);
 
   useEffect(() => {
-    if (editingInvoice) {
-      setForm({ ...editingInvoice, product: "", qty: "", rate: "" });
-    }
-  }, [editingInvoice]);
-
-  function addItem() {
-    if (!form.product || !form.qty || !form.rate) return;
-    const newItem = {
-      product: form.product,
-      qty: Number(form.qty),
-      rate: Number(form.rate),
-      total: Number(form.qty) * Number(form.rate)
+    const handler = (e) => {
+      if (e.detail?.type !== "invoice") return;
+      const inv = e.detail.data;
+      setRecordId(inv._id || null);
+      setCustomer(inv.customer?._id || inv.customer || "");
+      setItems((inv.items || []).map((it) => ({
+        product: it.product?._id || it.product || "",
+        qty: String(it.qty ?? ""),
+        rate: String(it.rate ?? ""),
+      })));
+      setDiscount(Number(inv.discount || 0));
+      setGst(Number(inv.gst || 0));
+      window.scrollTo({ top: 0, behavior: "smooth" });
     };
-    setForm({
-      ...form,
-      items: [...form.items, newItem],
-      product: "",
-      qty: "",
-      rate: ""
+    window.addEventListener("edit-entity", handler);
+    return () => window.removeEventListener("edit-entity", handler);
+  }, []);
+
+  const updateItem = (i, field, value) => {
+    setItems((prev) => {
+      const next = [...prev];
+      next[i] = { ...next[i], [field]: value };
+      return next;
     });
-  }
+  };
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-
-    const itemsWithTotal = form.items.map(i => ({
-      ...i,
-      total: i.qty * i.rate
-    }));
-
-    const subtotal = itemsWithTotal.reduce((sum, i) => sum + i.total, 0);
-    const grand = subtotal - (Number(form.discount) || 0) + (Number(form.gst) || 0);
-
-    const payload = { ...form, items: itemsWithTotal, grandTotal: grand };
-
-    try {
-      if (editingInvoice?._id) {
-        await axios.put(`http://localhost:5000/api/invoices/${editingInvoice._id}`, payload);
-      } else {
-        await axios.post("http://localhost:5000/api/invoices", payload);
-      }
-      onSaved();
-      setForm({ customer: "", items: [], discount: "", gst: "", product: "", qty: "", rate: "" });
-      clearEdit();
-    } catch (err) {
-      console.error("Save Invoice error:", err.response?.data || err.message);
+  const addItem = () => {
+    const last = items[items.length - 1];
+    if (last.product && last.qty && last.rate) {
+      setItems([...items, { product: "", qty: "", rate: "" }]);
     }
-  }
+  };
 
-  const subtotal = form.items.reduce((sum, i) => sum + (i.total || 0), 0);
-  const grandTotal = subtotal - (Number(form.discount) || 0) + (Number(form.gst) || 0);
+  const removeItem = (i) => setItems((prev) => prev.filter((_, idx) => idx !== i));
+
+  const reset = () => {
+    setRecordId(null);
+    setCustomer("");
+    setItems([{ product: "", qty: "", rate: "" }]);
+    setDiscount(0);
+    setGst(0);
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const cleanItems = items
+      .filter((it) => it.product && it.qty && it.rate)
+      .map((it) => ({
+        product: it.product,
+        qty: Number(it.qty),
+        rate: Number(it.rate),
+        total: Number(it.qty) * Number(it.rate),
+      }));
+    if (!customer || cleanItems.length === 0) return alert("Select customer and at least one complete item.");
+
+    const subtotal = cleanItems.reduce((s, it) => s + it.total, 0);
+    const payload = {
+      customer,
+      items: cleanItems,
+      discount: Number(discount || 0),
+      gst: Number(gst || 0),
+      grandTotal: subtotal - Number(discount || 0) + Number(gst || 0),
+    };
+
+    if (recordId) {
+      await axios.put(`http://localhost:5000/api/invoices/${recordId}`, payload);
+    } else {
+      await axios.post("http://localhost:5000/api/invoices", payload);
+    }
+    reset();
+    setRefresh(!refresh);
+  };
+
+  const canAdd = Boolean(items[items.length - 1].product && items[items.length - 1].qty && items[items.length - 1].rate);
 
   return (
-    <div className="p-4 bg-white rounded shadow">
-      <h2 className="text-xl font-bold mb-3">{editingInvoice ? "Edit Invoice" : "New Invoice"}</h2>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <select
-          value={form.customer}
-          onChange={(e) => setForm({ ...form, customer: e.target.value })}
-          className="border p-2 w-full"
-          required
-        >
-          <option value="">Select Customer</option>
-          {customers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-        </select>
+    <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 p-6 rounded-xl shadow-lg mb-6 border border-indigo-200">
+      <h2 className="text-lg font-bold text-indigo-700 mb-4">{recordId ? "✏️ Edit Invoice" : "➕ New Invoice"}</h2>
 
-        <div className="flex space-x-2">
-          <select
-            value={form.product}
-            onChange={(e) => setForm({ ...form, product: e.target.value })}
-            className="border p-2 flex-1"
-          >
-            <option value="">Select Product</option>
-            {products.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+      <form onSubmit={submit} className="grid gap-4">
+        <div>
+          <label className="text-sm font-medium">Customer <span className="text-red-500">*</span></label>
+          <select className="border p-2 w-full rounded focus:ring-2 focus:ring-indigo-400"
+                  value={customer} onChange={(e) => setCustomer(e.target.value)}>
+            <option value="">Select Customer</option>
+            {(customers || []).map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
           </select>
-          <input
-            type="number"
-            placeholder="Qty"
-            value={form.qty}
-            onChange={(e) => setForm({ ...form, qty: e.target.value })}
-            className="border p-2 w-20"
-          />
-          <input
-            type="number"
-            placeholder="Rate"
-            value={form.rate}
-            onChange={(e) => setForm({ ...form, rate: e.target.value })}
-            className="border p-2 w-24"
-          />
-          <button type="button" onClick={addItem} className="bg-blue-500 text-white px-3 rounded">+ Add Item</button>
         </div>
 
-        <ul className="list-disc pl-5">
-          {form.items.map((i, idx) => (
-            <li key={idx}>
-              {products.find(p => p._id === i.product)?.name || "Unknown"} – {i.qty} × {i.rate} = {i.total}
-            </li>
-          ))}
-        </ul>
+        {items.map((it, i) => (
+          <div key={i} className="grid grid-cols-12 gap-3 items-end">
+            <div className="col-span-4">
+              <label className="text-sm font-medium">Product <span className="text-red-500">*</span></label>
+              <select className="border p-2 w-full rounded focus:ring-2 focus:ring-indigo-400"
+                      value={it.product} onChange={(e) => updateItem(i, "product", e.target.value)}>
+                <option value="">Select</option>
+                {(products || []).map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div className="col-span-3">
+              <label className="text-sm font-medium">Quantity <span className="text-red-500">*</span></label>
+              <input type="number" className="border p-2 w-full rounded focus:ring-2 focus:ring-indigo-400"
+                     value={it.qty} onChange={(e) => updateItem(i, "qty", e.target.value)} />
+            </div>
+            <div className="col-span-3">
+              <label className="text-sm font-medium">Rate <span className="text-red-500">*</span></label>
+              <input type="number" className="border p-2 w-full rounded focus:ring-2 focus:ring-indigo-400"
+                     value={it.rate} onChange={(e) => updateItem(i, "rate", e.target.value)} />
+            </div>
+            <div className="col-span-2 flex justify-end">
+              {items.length > 1 && (
+                <button type="button" onClick={() => removeItem(i)} className="bg-rose-600 text-white px-3 py-2 rounded">
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
 
-        <input
-          type="number"
-          placeholder="Discount"
-          value={form.discount}
-          onChange={(e) => setForm({ ...form, discount: e.target.value })}
-          className="border p-2 w-full"
-          min="0"
-        />
-        <input
-          type="number"
-          placeholder="GST"
-          value={form.gst}
-          onChange={(e) => setForm({ ...form, gst: e.target.value })}
-          className="border p-2 w-full"
-          min="0"
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium">Discount</label>
+            <input type="number" className="border p-2 w-full rounded focus:ring-2 focus:ring-indigo-400"
+                   value={discount} onChange={(e) => setDiscount(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium">GST</label>
+            <input type="number" className="border p-2 w-full rounded focus:ring-2 focus:ring-indigo-400"
+                   value={gst} onChange={(e) => setGst(e.target.value)} />
+          </div>
+        </div>
 
-        <p className="font-bold">Subtotal: {subtotal}</p>
-        <p className="font-bold">Grand Total: {grandTotal}</p>
-
-        <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded">
-          {editingInvoice ? "Update Invoice" : "Save Invoice"}
-        </button>
+        <div className="flex justify-between mt-2">
+          <button type="button" onClick={addItem}
+                  className={`px-4 py-2 rounded-lg shadow text-white transition ${canAdd ? "bg-gray-700 hover:scale-105" : "bg-gray-300 cursor-not-allowed"}`}>
+            + Item
+          </button>
+          <div className="space-x-2">
+            {recordId && <button type="button" onClick={reset} className="bg-gray-200 px-4 py-2 rounded">Cancel</button>}
+            <button className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-lg">
+              {recordId ? "Update Invoice" : "Save Invoice"}
+            </button>
+          </div>
+        </div>
       </form>
     </div>
   );

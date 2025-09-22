@@ -1,91 +1,140 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 
-export default function PurchaseForm({ onSaved }) {
-  const [form, setForm] = useState({ supplier: "", product: "", qty: "", rate: "" });
+export default function PurchaseForm({ refresh, setRefresh }) {
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [recordId, setRecordId] = useState(null);
+
+  const [supplier, setSupplier] = useState("");
+  const [items, setItems] = useState([{ product: "", qty: "", rate: "" }]);
 
   useEffect(() => {
-    loadSuppliers();
-    loadProducts();
+    axios.get("http://localhost:5000/api/suppliers").then((r) => setSuppliers(r.data || []));
+    axios.get("http://localhost:5000/api/products").then((r) => setProducts(r.data || []));
   }, []);
 
-  async function loadSuppliers() {
-    const res = await axios.get("http://localhost:5000/api/suppliers");
-    setSuppliers(res.data);
-  }
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.type !== "purchase") return;
+      const p = e.detail.data;
+      setRecordId(p._id || null);
+      setSupplier(p.supplier?._id || p.supplier || "");
+      setItems((p.items || []).map((it) => ({
+        product: it.product?._id || it.product || "",
+        qty: String(it.qty ?? ""),
+        rate: String(it.rate ?? ""),
+      })));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener("edit-entity", handler);
+    return () => window.removeEventListener("edit-entity", handler);
+  }, []);
 
-  async function loadProducts() {
-    const res = await axios.get("http://localhost:5000/api/products");
-    setProducts(res.data);
-  }
+  const updateItem = (i, field, value) => {
+    setItems((prev) => {
+      const next = [...prev];
+      next[i] = { ...next[i], [field]: value };
+      return next;
+    });
+  };
 
-  function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  }
+  const addItem = () => {
+    const last = items[items.length - 1];
+    if (last.product && last.qty && last.rate) {
+      setItems([...items, { product: "", qty: "", rate: "" }]);
+    }
+  };
 
-  async function handleSubmit(e) {
+  const removeItem = (i) => setItems((prev) => prev.filter((_, idx) => idx !== i));
+
+  const reset = () => {
+    setRecordId(null);
+    setSupplier("");
+    setItems([{ product: "", qty: "", rate: "" }]);
+  };
+
+  const submit = async (e) => {
     e.preventDefault();
-    await axios.post("http://localhost:5000/api/purchases", form);
-    onSaved();
-    setForm({ supplier: "", product: "", qty: "", rate: "" });
-  }
+    const cleanItems = items
+      .filter((it) => it.product && it.qty && it.rate)
+      .map((it) => ({
+        product: it.product,
+        qty: Number(it.qty),
+        rate: Number(it.rate),
+        total: Number(it.qty) * Number(it.rate),
+      }));
+    if (!supplier || cleanItems.length === 0) return alert("Select supplier and at least one complete item.");
+
+    const payload = { supplier, items: cleanItems, totalAmount: cleanItems.reduce((s, it) => s + it.total, 0) };
+    if (recordId) {
+      await axios.put(`http://localhost:5000/api/purchases/${recordId}`, payload);
+    } else {
+      await axios.post("http://localhost:5000/api/purchases", payload);
+    }
+    reset();
+    setRefresh(!refresh);
+  };
+
+  const canAdd = Boolean(items[items.length - 1].product && items[items.length - 1].qty && items[items.length - 1].rate);
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-lg p-6 max-w-md mx-auto mb-6">
-      <h2 className="text-2xl font-semibold text-gray-700 mb-4">Create Purchase Order</h2>
+    <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 p-6 rounded-xl shadow-lg mb-6 border border-yellow-200">
+      <h2 className="text-lg font-bold text-yellow-700 mb-4">{recordId ? "✏️ Edit Purchase" : "➕ New Purchase"}</h2>
 
-      <select
-        name="supplier"
-        value={form.supplier}
-        onChange={handleChange}
-        required
-        className="w-full p-2 mb-3 border border-gray-300 rounded"
-      >
-        <option value="">Select Supplier</option>
-        {suppliers.map((s) => (
-          <option key={s._id} value={s._id}>{s.name}</option>
+      <form onSubmit={submit} className="grid gap-4">
+        <div>
+          <label className="text-sm font-medium">Supplier <span className="text-red-500">*</span></label>
+          <select className="border p-2 w-full rounded focus:ring-2 focus:ring-yellow-400"
+                  value={supplier} onChange={(e) => setSupplier(e.target.value)}>
+            <option value="">Select Supplier</option>
+            {(suppliers || []).map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
+          </select>
+        </div>
+
+        {items.map((it, i) => (
+          <div key={i} className="grid grid-cols-12 gap-3 items-end">
+            <div className="col-span-4">
+              <label className="text-sm font-medium">Product <span className="text-red-500">*</span></label>
+              <select className="border p-2 w-full rounded focus:ring-2 focus:ring-yellow-400"
+                      value={it.product} onChange={(e) => updateItem(i, "product", e.target.value)}>
+                <option value="">Select</option>
+                {(products || []).map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div className="col-span-3">
+              <label className="text-sm font-medium">Quantity <span className="text-red-500">*</span></label>
+              <input type="number" className="border p-2 w-full rounded focus:ring-2 focus:ring-yellow-400"
+                     value={it.qty} onChange={(e) => updateItem(i, "qty", e.target.value)} />
+            </div>
+            <div className="col-span-3">
+              <label className="text-sm font-medium">Rate <span className="text-red-500">*</span></label>
+              <input type="number" className="border p-2 w-full rounded focus:ring-2 focus:ring-yellow-400"
+                     value={it.rate} onChange={(e) => updateItem(i, "rate", e.target.value)} />
+            </div>
+            <div className="col-span-2 flex justify-end">
+              {items.length > 1 && (
+                <button type="button" onClick={() => removeItem(i)} className="bg-rose-600 text-white px-3 py-2 rounded">
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
         ))}
-      </select>
 
-      <select
-        name="product"
-        value={form.product}
-        onChange={handleChange}
-        required
-        className="w-full p-2 mb-3 border border-gray-300 rounded"
-      >
-        <option value="">Select Product</option>
-        {products.map((p) => (
-          <option key={p._id} value={p._id}>{p.name}</option>
-        ))}
-      </select>
-
-      <input
-        type="number"
-        name="qty"
-        value={form.qty}
-        onChange={handleChange}
-        placeholder="Quantity"
-        required
-        className="w-full p-2 mb-3 border border-gray-300 rounded"
-      />
-
-      <input
-        type="number"
-        name="rate"
-        value={form.rate}
-        onChange={handleChange}
-        placeholder="Rate"
-        required
-        className="w-full p-2 mb-3 border border-gray-300 rounded"
-      />
-
-      <button type="submit" className="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 transition">
-        Create PO
-      </button>
-    </form>
+        <div className="flex justify-between mt-2">
+          <button type="button" onClick={addItem}
+                  className={`px-4 py-2 rounded-lg shadow text-white transition ${canAdd ? "bg-gray-700 hover:scale-105" : "bg-gray-300 cursor-not-allowed"}`}>
+            + Item
+          </button>
+          <div className="space-x-2">
+            {recordId && <button type="button" onClick={reset} className="bg-gray-200 px-4 py-2 rounded">Cancel</button>}
+            <button className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-2 rounded-lg">
+              {recordId ? "Update Purchase" : "Save Purchase"}
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
   );
 }
-

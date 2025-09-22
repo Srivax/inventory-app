@@ -1,78 +1,56 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 
-export default function PurchaseTable({ refresh, onConfirmed }) {
-  const [purchases, setPurchases] = useState([]);
+export default function PurchaseTable({ refresh, setRefresh }) {
+  const [rows, setRows] = useState([]);
 
   useEffect(() => {
-    loadPurchases();
+    axios
+      .get("http://localhost:5000/api/purchases")
+      .then((r) => setRows(r.data || []))
+      .catch(() => setRows([]));
   }, [refresh]);
 
-  async function loadPurchases() {
-    const res = await axios.get("http://localhost:5000/api/purchases");
-    setPurchases(res.data);
-  }
+  const editRow = (p) =>
+    window.dispatchEvent(new CustomEvent("edit-entity", { detail: { type: "purchase", data: p } }));
 
-  async function confirmGRN(id) {
-    await axios.put(`http://localhost:5000/api/purchases/${id}/confirm`);
-    onConfirmed();
-  }
-
-  async function deletePurchase(id) {
+  const delRow = async (id) => {
+    if (!window.confirm("Delete purchase?")) return;
     await axios.delete(`http://localhost:5000/api/purchases/${id}`);
-    loadPurchases();
-  }
+    setRefresh(!refresh);
+  };
+
+  const fmtAmt = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
   return (
-    <div className="overflow-x-auto max-w-4xl mx-auto">
-      <h2 className="text-2xl font-semibold text-gray-700 mb-4">Purchase Orders</h2>
-      <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
-        <thead className="bg-indigo-600 text-white">
+    <div className="bg-white p-6 rounded-xl shadow-md border border-yellow-200">
+      <h2 className="text-lg font-bold text-yellow-700 mb-4">Purchases</h2>
+      <table className="w-full text-center border-collapse">
+        <thead className="bg-yellow-600 text-white">
           <tr>
-            <th className="py-2 px-4 text-left">Supplier</th>
-            <th className="py-2 px-4 text-left">Product</th>
-            <th className="py-2 px-4 text-left">Qty</th>
-            <th className="py-2 px-4 text-left">Rate</th>
-            <th className="py-2 px-4 text-left">Total</th>
-            <th className="py-2 px-4 text-left">Status</th>
-            <th className="py-2 px-4 text-left">Action</th>
+            <th className="px-4 py-2">Supplier</th>
+            <th className="px-4 py-2">Total</th>
+            <th className="px-4 py-2">Status</th>
+            <th className="px-4 py-2">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {purchases.map((p) => (
-            <tr key={p._id} className="border-b hover:bg-gray-100 transition-colors">
-              <td className="py-2 px-4">{p.supplier?.name}</td>
-              <td className="py-2 px-4">{p.product?.name}</td>
-              <td className="py-2 px-4">{p.qty}</td>
-              <td className="py-2 px-4">{p.rate}</td>
-              <td className="py-2 px-4">{p.total}</td>
-              <td className="py-2 px-4">
-                <span className={`px-2 py-1 rounded ${p.status === "Pending" ? "bg-yellow-200 text-yellow-800" : "bg-green-200 text-green-800"}`}>
-                  {p.status}
-                </span>
-              </td>
-              <td className="py-2 px-4">
-                {p.status === "Pending" && (
-                  <button
-                    onClick={() => confirmGRN(p._id)}
-                    className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 transition mr-2"
-                  >
-                    Confirm GRN
-                  </button>
-                )}
-                <button
-                  onClick={() => deletePurchase(p._id)}
-                  className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
-                >
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
-          {purchases.length === 0 && (
-            <tr>
-              <td colSpan="7" className="py-4 px-4 text-gray-500 text-center">No purchase orders yet</td>
-            </tr>
+          {rows.length === 0 ? (
+            <tr><td colSpan="4" className="py-4 text-gray-500">No purchases</td></tr>
+          ) : (
+            rows
+              .filter((p) => p && p.totalAmount > 0)
+              .map((p) => (
+                <tr key={p._id} className="border-b hover:bg-yellow-50">
+                  <td className="py-2">{p.supplier?.name || "—"}</td>
+                  <td>{fmtAmt(p.totalAmount)}</td>
+                  <td>{p.status || "Received"}</td>
+                  <td className="space-x-2">
+                    <button onClick={() => editRow(p)} className="bg-yellow-500 text-white px-3 py-1 rounded">Edit</button>
+                    <button onClick={() => delRow(p._id)} className="bg-rose-600 text-white px-3 py-1 rounded">Delete</button>
+                  </td>
+                </tr>
+              ))
           )}
         </tbody>
       </table>
